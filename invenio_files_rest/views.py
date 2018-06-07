@@ -29,7 +29,7 @@ from __future__ import absolute_import, print_function
 import uuid
 from functools import partial, wraps
 
-from flask import Blueprint, abort, current_app, request
+from flask import Blueprint, abort, after_this_request, current_app, request
 from flask_login import current_user
 from invenio_db import db
 from invenio_rest import ContentNegotiatedMethodView
@@ -594,7 +594,14 @@ class ObjectResource(ContentNegotiatedMethodView):
             current_app.logger.warning(
                 'File checksum mismatch detected.', extra=logger_data)
 
-        file_downloaded.send(current_app._get_current_object(), obj=obj)
+        @after_this_request
+        def send_file_downloaded(response):
+            if response.status_code in (200, 304):
+                file_downloaded.send(
+                    current_app._get_current_object(), obj=obj)
+            return response
+
+        # file_downloaded.send(current_app._get_current_object(), obj=obj)
         return obj.send_file(restricted=restricted,
                              as_attachment=as_attachment)
 
